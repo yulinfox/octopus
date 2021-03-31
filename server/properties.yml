@@ -1,0 +1,6 @@
+server:
+  effective: 300
+  coexist: 5
+client:
+  id: client
+  secret: 123456
