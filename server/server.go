@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -211,15 +213,26 @@ func write(data interface{}, w http.ResponseWriter) {
 func loadConfig() {
 	content, err := ioutil.ReadFile("properties.yml")
 	if err != nil {
-		fmt.Println(err)
+		log.Println("config load error: ", err.Error())
 		return
 	}
 	config := &OauthConfig{}
 	yaml.Unmarshal(content, &config)
-	effective = (*config).Server.Effective
-	coexist = (*config).Server.Coexist
+	configEffective := (*config).Server.Effective
+	configCoexist := (*config).Server.Coexist
+	if (configEffective < configCoexist) {
+		log.Println("config load error: coexist > effective")
+		return
+	}
+	if (configEffective - configCoexist < configCoexist) {
+		log.Println("config load error: coexist > effective - coexist")
+		return
+	}
+	effective = configEffective
+	coexist = configCoexist
 	clientId = (*config).Client.Id
 	clientSecret = (*config).Client.Secret
+	log.Println("load config success")
 }
 
 func main()  {
