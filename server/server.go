@@ -212,6 +212,7 @@ func loadConfig() {
 	content, err := ioutil.ReadFile("properties.yml")
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	config := &OauthConfig{}
 	yaml.Unmarshal(content, &config)
