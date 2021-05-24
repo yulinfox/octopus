@@ -42,13 +42,15 @@ type CheckError struct {
 type CheckResult struct {
 	Scope []string `json:"scope"`
 	Active bool `json:"active"`
-	Exp int `json:"exp"`
+	Exp int64 `json:"exp"`
 	ClientId string `json:"client_id"`
 }
 
 type ServerConfig struct {
 	Effective int `yaml:"effective"`
 	Coexist   int `yaml:"coexist"`
+	GracePeriod int64 `yaml:"gracePeriod"`
+	Port string `yaml:"port"`
 }
 
 type ClientConfig struct {
@@ -80,6 +82,11 @@ var effective int = 300
 var clientId string = "client"
 var clientSecret string = "123456"
 
+// 免校验时间
+var ignoreEndTime int64 = 0
+
+// 端口
+var port string = "9800"
 
 /**
  * 获取新的token
@@ -158,7 +165,7 @@ func checkTokenHandler(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		requestTokenStr = r.Form.Get("token")
 	}
-	fmt.Println(requestTokenStr)
+	log.Println(requestTokenStr)
 	u, p, ok := r.BasicAuth();
 	if (!ok || u != clientId || p != clientSecret) {
 		// basic 验证
@@ -170,6 +177,19 @@ func checkTokenHandler(w http.ResponseWriter, r *http.Request) {
 		write(CheckError{Error: "invalid_token", ErrorDescription: "Token was not recognised"}, w)
 		return
 	}
+
+	// 如果在免验证时间范围内，不做校验
+	if (ignoreEndTime > time.Now().Unix()) {
+		write(CheckResult{
+			Scope: []string{"app"},
+			Active: true,
+			Exp: ignoreEndTime - time.Now().Unix(),
+			ClientId: u,
+		}, w)
+		return
+	}
+
+
 	if (requestTokenStr == token.token) {
 		requestToken = token
 	} else if (requestTokenStr == oldToken.token) {
@@ -185,7 +205,7 @@ func checkTokenHandler(w http.ResponseWriter, r *http.Request) {
 	write(CheckResult{
 		Scope: []string{"app"},
 		Active: true,
-		Exp: int(requestToken.expire - time.Now().Unix()),
+		Exp: requestToken.expire - time.Now().Unix(),
 		ClientId: u,
 	}, w)
 }
@@ -220,6 +240,14 @@ func loadConfig() {
 	yaml.Unmarshal(content, &config)
 	configEffective := (*config).Server.Effective
 	configCoexist := (*config).Server.Coexist
+	gracePeriod := (*config).Server.GracePeriod
+	port = (*config).Server.Port
+	if port == "" {
+		port = "9800"
+	}
+	if (gracePeriod > 0) {
+		ignoreEndTime = time.Now().Unix() + gracePeriod
+	}
 	if (configEffective < configCoexist) {
 		log.Println("config load error: coexist > effective")
 		return
@@ -240,5 +268,6 @@ func main()  {
 	http.HandleFunc("/oauth/token", getTokenHandler)
 	http.HandleFunc("/oauth/check_token", checkTokenHandler)
 	http.HandleFunc("/oauth/reload_config", reloadConfigHandler)
-	http.ListenAndServe(":9800", nil)
+	log.Println("server initialized with port " + port)
+	http.ListenAndServe(":" + port, nil)
 }
