@@ -121,7 +121,7 @@ func getAccessToken() AccessToken {
 	vo := AccessToken{
 		AccessToken: token.token, 
 		TokenType: "bearer", 
-		ExpiresIn: int(token.expire - time.Now().Unix()),
+		ExpiresIn: int(token.expire - time.Now().Unix()) - coexist,
 		Scope: "app",
 	}
 	return vo
